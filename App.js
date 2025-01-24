@@ -1,114 +1,70 @@
-import React, {useEffect, useState, useRef} from 'react';
-import {
-  StyleSheet,
-  View,
-  Platform,
-  PermissionsAndroid,
-  Alert,
-  ActivityIndicator,
-  Button,
-} from 'react-native';
-import MapView, {Marker, Polyline} from 'react-native-maps';
-import Geolocation from '@react-native-community/geolocation';
-import {getDistance} from 'geolib';
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View,Button,Alert } from 'react-native';
+import Mapview,{Marker,Polyline} from 'react-native-maps';
+import react, * as React from 'react';
+import * as Location from 'expo-location';
+import MapViewDirections from 'react-native-maps-directions';
+import {GoogleMap} from "@env";
+import { getDistance } from 'geolib';
+
+
+
 
 export default function App() {
-  const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState(null);
-  const [destination, setDestination] = useState(null);
-  const [isChoosingSource, setIsChoosingSource] = useState(false);
-  const [isChoosingDestination, setIsChoosingDestination] = useState(false);
-  const mapRef = useRef(null);
+  const[IsChoosingSource, setIsChoosingSource]= React.useState(false);
+  const[IsChoosingDestination, setIsChoosingDestination]= React.useState(false);
 
-  const defaultLocation = {
-    latitude: 37.78825,
-    longitude: -122.4324,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  };
 
-  const getCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
-      position => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-        setLoading(false);
-      },
-      error => {
-        Alert.alert(
-          'Error',
-          `Failed to get your location: ${error.message}` +
-            ' Make sure your location is enabled.',
-        );
-        setLocation(defaultLocation);
-        setLoading(false);
-      }
-    );
-  };
+  const [origin,setOrigin]=React.useState({
+    latitude: 32.436087, 
 
-  useEffect(() => {
-    const requestLocationPermission = async () => {
-      if (Platform.OS === 'android') {
-        try {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          );
-          if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-            getCurrentLocation();
-          } else {
-            Alert.alert(
-              'Permission Denied',
-              'Location permission is required to show your current location on the map.',
-            );
-            setLocation(defaultLocation);
-            setLoading(false);
-          }
-        } catch (err) {
-          console.warn(err);
-          setLocation(defaultLocation);
-          setLoading(false);
-        }
-      } else {
-        getCurrentLocation();
-      }
-    };
+    longitude: -114.759567
+  });
+  const [destination,setDestination]=React.useState({
+    latitude: 32.449849, 
+    longitude:-114.758752 ,
+  });
 
-    requestLocationPermission();
-  }, []);
+  React.useEffect(()=>{
+    getLocationPermission();
+  },[])
 
-  const handleMapPress = e => {
-    const coordinate = e.nativeEvent.coordinate;
-    if (isChoosingSource) {
-      setSource(coordinate);
-      setIsChoosingSource(false);
-    } else if (isChoosingDestination) {
-      setDestination(coordinate);
-      setIsChoosingDestination(false);
+  async function getLocationPermission() {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      alert("Permission denied");
+      return;
     }
-  };
+    let location = await Location.getCurrentPositionAsync({});
+    const current = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+    setOrigin(current);
+  }
 
   const showCoordinates = () => {
-    if (source && destination) {
+    if (origin && destination) {
       const distance =
         getDistance(
-          {latitude: source.latitude, longitude: source.longitude},
+          {latitude: origin.latitude, longitude: origin.longitude},
           {latitude: destination.latitude, longitude: destination.longitude},
-        ) / 1000; // Convert to kilometers
+
+        ) / 1000;
       Alert.alert(
-        'Coordinates and Distance',
-        `Source: \nLatitude: ${source.latitude}, Longitude: ${
-          source.longitude
-        }\n\nDestination: \nLatitude: ${destination.latitude}, Longitude: ${
+        
+        'Coordenadas y distancia',
+        `Origen: \nLatitude: ${origin.latitude}, Longitude: ${
+          origin.longitude
+
+        }\n \n Destino: \nLatitude: ${destination.latitude}, Longitude: ${
           destination.longitude
-        }\n\nDistance between source and destination: ${distance.toFixed(
+        }
+        \n\nDistancia entre el origen y destino: ${distance.toFixed(
           2,
-        )} kilometers`,
+        )} kilometros`,
       );
+
     } else {
       Alert.alert(
         'Error',
@@ -117,121 +73,102 @@ export default function App() {
     }
   };
 
-  const removeSource = () => {
-    setSource(null);
-  };
 
-  const removeDestination = () => {
-    setDestination(null);
-  };
 
-  const zoomToMarker = marker => {
-    if (mapRef.current && marker) {
-      mapRef.current.animateToRegion({
-        latitude: marker.latitude,
-        longitude: marker.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
+  const handleMapPress=(e)=>{
+    const coordinates=e.nativeEvent.coordinate
+    if(IsChoosingSource){
+      setOrigin(coordinates);
+      setIsChoosingSource(false);
+    }else if (IsChoosingDestination){
+      setDestination(coordinates);
+      setIsChoosingDestination(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
-      ) : (
-        <>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            showsUserLocation={true}
-            region={location}
-            onPress={handleMapPress}>
-            {/* Render default markers */}
-            <Marker coordinate={location} />
-            {/* Render main markers */}
-            {source && (
-              <Marker
-                coordinate={source}
-                title={'Source'}
-                description={'Your source location'}
-                pinColor={'green'}
-                onPress={() => zoomToMarker(source)}
-              />
-            )}
-            {destination && (
-              <Marker
-                coordinate={destination}
-                title={'Destination'}
-                description={'Your destination location'}
-                pinColor={'blue'}
-                onPress={() => zoomToMarker(destination)}
-              />
-            )}
-            {source && destination && (
-              <Polyline
-                coordinates={[source, destination]}
-                strokeColor="#000"
-                strokeWidth={2}
-              />
-            )}
-          </MapView>
-          <View style={styles.buttonContainer}>
-            <View style={styles.buttonGroup}>
-              {source ? (
-                <Button title="Remove Source" onPress={removeSource} />
-              ) : (
-                <Button
-                  title={
-                    isChoosingSource ? 'Please Choose Source' : 'Choose Source'
-                  }
-                  onPress={() => setIsChoosingSource(true)}
-                />
-              )}
-              {destination ? (
-                <Button
-                  title="Remove Destination"
-                  onPress={removeDestination}
-                />
-              ) : (
-                <Button
-                  title={
-                    isChoosingDestination
-                      ? 'Please Choose Destination'
-                      : 'Choose Destination'
-                  }
-                  onPress={() => setIsChoosingDestination(true)}
-                />
-              )}
-            </View>
-            <Button title="Show Coordinates" onPress={showCoordinates} />
-          </View>
-        </>
-      )}
+      <Mapview style={styles.map}
+      onPress={handleMapPress}
+      initialRegion={{
+        latitude:origin.latitude,
+        longitude: origin.longitude,
+        latitudeDelta:0.09,
+        longitudeDelta:0.04
+
+
+      }}
+      >
+        
+        <Marker
+        draggable
+        coordinate={origin}
+        onDragEnd={(direction)=>setOrigin(direction.nativeEvent.coordinate)}
+        />
+        <Marker
+        draggable
+        coordinate={destination}
+        onDragEnd={(direction)=>setDestination(direction.nativeEvent.coordinate)}
+        />
+        <MapViewDirections style={styles.carImage}
+        origin={origin}
+        destination={destination}
+        apikey={GoogleMap}
+        strokeColor='pink'
+        strokeWidth={8}
+        />
+        {/* 
+        <Polyline
+        coordinates={[origin, destination]}
+        strokeColor='pink'
+        strokeWidth={8}
+        /> */}
+
+      </Mapview>
+      <View style={styles.buttonContainer}>
+        <View style={styles.buttonGroup}>
+          <Button
+          title={IsChoosingSource ? 'please choose source': 'choose origen'}
+          onPress={()=>setIsChoosingSource(true)}
+          />
+          <Button
+          title={IsChoosingDestination ? 'please choose destination': 'choose destination'}
+          onPress={()=>setIsChoosingDestination(true)}
+          />
+
+        </View>
+        <Button title="show coordinates" onPress={showCoordinates}/>
+      </View>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-
+    flex: 1,
+    backgroundColor: '#fff',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  map: {
-    ...StyleSheet.absoluteFillObject,
+  map:{
+    width:'100%',
+    height:'100%'
   },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+  carImage:{
+    width:"120",
+    height:"120"
   },
-  buttonGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+  buttonContainer:{
+    position:"absolute",
+    bottom:20,
+    left:20,
+    right:20,
   },
+  buttonGroup:{
+    flexDirection:"row",
+    justifyContent:"space-between",
+    marginBottom:10,
+  }
 });
+
